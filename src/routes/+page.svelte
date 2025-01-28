@@ -15,6 +15,7 @@
   } from "$lib";
 
   let worker: Worker;
+  let canvas: HTMLCanvasElement;
 
   let clientName: string = "";
 
@@ -24,9 +25,33 @@
     const Worker = await import("$lib/workers/psd.worker?worker");
 
     worker = new Worker.default();
-    worker.onmessage = function (e: MessageEvent) {
-      const { status, message } = e.data;
-      console.log(status, message);
+    worker.onmessage = function (
+      e: MessageEvent<
+        {
+          [key: string]: string;
+          // } & { imageData: ImageData } & {
+        } & { imageData: Uint8ClampedArray } & {
+          width: number;
+          height: number;
+        }
+      >,
+    ) {
+      const { status, psd, imageData: rgba, width, height } = e.data;
+
+      const context = canvas.getContext("2d")!;
+
+      // canvas.width = imageData.width;
+      // canvas.height = imageData.height;
+
+      canvas.width = width;
+      canvas.height = height;
+
+      const imageData = context.createImageData(width, height);
+      imageData.data.set(rgba);
+      context.putImageData(imageData, 0, 0);
+
+      // canvas.getContext("bitmaprenderer")?.transferFromImageBitmap(bitmap);
+      // canvas.getContext("2d")?.putImageData(imageData, 0, 0);
     };
   }
 
@@ -46,7 +71,9 @@
   }
 
   onMount(() => {
-    initWebWorker();
+    initWebWorker().then(() => {
+      worker.postMessage("Mockup Generator");
+    });
   });
 
   onDestroy(() => {
@@ -80,12 +107,12 @@
     </div>
 
     <div class="row-start-1 md:row-start-auto">
-      <AspectRatio ratio={16 / 9} class="overflow-hidden rounded-lg">
-        <img
-          src="https://mockupfree.co/wp-content/uploads/free-branding-psd-book-mockup-design-p2.webp"
-          alt={"Temporary image"}
-          class="object-cover object-center"
-        />
+      <!-- <AspectRatio ratio={16 / 12} class="overflow-hidden rounded-lg">
+        
+      </AspectRatio> -->
+
+      <AspectRatio ratio={16 / 12} class="overflow-hidden rounded-lg">
+        <canvas bind:this={canvas} id="result-canvas" class="w-full"></canvas>
       </AspectRatio>
     </div>
   </CardContent>
